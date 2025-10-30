@@ -1,0 +1,38 @@
+# Sample Insurance Claim Descriptions
+# Use these to test the Claims Description Normalizer
+
+# Sample 1 - Minor Car Accident
+Customer reported minor accident on rear bumper, scratches only, no injuries, estimated cost ₹7,000. Incident happened yesterday at parking lot near office.
+
+# Sample 2 - Flood Damage
+Vehicle submerged during flood, engine not starting, electrical damage suspected. Major repairs needed.
+
+# Sample 3 - Kitchen Fire
+Fire reported in kitchen at 2:00 AM on Oct 15. Cabinets, microwave, and wall damaged. Customer estimates around $5000 damage. Fire department attended.
+
+# Sample 4 - Water Leakage
+Customer called about water leakage from ceiling damaging furniture below. Not sure when it started, probably last week.
+
+# Sample 5 - Car Theft
+Vehicle stolen from residential parking area on Oct 28, 2025 around 3 AM. Honda Civic 2022 model, black color. Police report filed. Estimated value $25,000.
+
+# Sample 6 - Storm Damage
+Heavy storm last night caused tree branch to fall on vehicle roof. Windshield cracked, roof dented. No estimate yet. Happened at home driveway.
+
+# Sample 7 - Vandalism
+Customer reported vehicle vandalized with spray paint and broken side mirrors. Occurred somewhere between Oct 20-22 while parked on street. Estimated repair cost ₹15,000.
+
+# Sample 8 - House Fire (Critical)
+Major house fire on Oct 29, 2025 at 11 PM on Maple Street. Entire second floor destroyed, first floor severely damaged by smoke and water from firefighting. Family evacuated safely. Total loss estimated over $200,000. Cause under investigation.
+
+# Sample 9 - Slip and Fall
+Customer slipped on wet floor in shopping mall on Oct 30, 2025 around 2 PM. Injured right ankle, medical treatment required. Mall located at City Center. Medical bills approximately $2,500.
+
+# Sample 10 - Hail Damage
+Vehicle damaged by hail storm yesterday evening. Multiple dents on hood and roof, rear windshield cracked. Car was parked outside during storm. Preliminary estimate around $8,000.
+
+# Sample 11 - Pipe Burst
+Pipe burst in basement overnight, water flooded entire basement area. Carpet, drywall, and stored items damaged. Incident discovered this morning. Plumber called for emergency repair. No cost estimate yet.
+
+# Sample 12 - Multi-Vehicle Collision
+Involved in 3-car collision on Highway 101 on Oct 30 at 8:15 AM. Front end damage to vehicle, airbags deployed. Driver has minor injuries - whiplash. Other vehicles also damaged. Police attended scene. Estimate pending insurance adjuster inspection.

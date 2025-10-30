@@ -49,6 +49,8 @@ st.markdown("""
         padding: 1.5rem;
         border-radius: 10px;
         margin: 1rem 0;
+        color: #000000;
+        line-height: 1.6;
     }
     .metric-card {
         background-color: #ffffff;

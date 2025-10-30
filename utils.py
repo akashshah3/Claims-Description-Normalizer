@@ -71,7 +71,7 @@ def highlight_keywords_in_text(text: str, keywords: List[str]) -> str:
         # Case-insensitive replacement with HTML highlighting
         pattern = re.compile(re.escape(keyword), re.IGNORECASE)
         highlighted_text = pattern.sub(
-            lambda m: f'<span style="background-color: #ffeb3b; padding: 2px 4px; border-radius: 3px; font-weight: bold;">{m.group()}</span>',
+            lambda m: f'<span style="background-color: #ffeb3b; color: #000000; padding: 2px 4px; border-radius: 3px; font-weight: bold;">{m.group()}</span>',
             highlighted_text
         )
     

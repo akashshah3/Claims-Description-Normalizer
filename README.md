@@ -297,7 +297,26 @@ Contributions are welcome! Here's how:
 
 ---
 
-## 📄 License
+## � Changelog
+
+### Version 1.1 (October 31, 2025)
+- **🐛 Bug Fix**: Fixed dark mode visibility issue in keyword highlighting
+  - Added explicit black text color (`#000000`) to highlighted keywords
+  - Added explicit black text color to highlight-box container
+  - Improved line-height for better readability
+  - Ensures proper contrast in both light and dark themes
+
+### Version 1.0 (October 31, 2025)
+- Initial release with core features
+- Gemini 2.0 Flash integration
+- 8-field structured extraction
+- Keyword highlighting and explainability
+- Confidence scoring
+- Sample claims library
+
+---
+
+## �📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 

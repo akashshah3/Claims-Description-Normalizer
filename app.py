@@ -23,9 +23,22 @@ from utils import (
     format_field_name,
     create_summary_stats
 )
+from database import (
+    init_database,
+    save_claim_to_history,
+    get_all_history,
+    get_history_by_id,
+    delete_history_item,
+    search_history,
+    get_history_stats,
+    clear_all_history
+)
 
 # Load environment variables
 load_dotenv()
+
+# Initialize database
+init_database()
 
 # Page configuration
 st.set_page_config(
@@ -262,50 +275,79 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.header("ℹ️ About")
+        st.header("🎯 Quick Actions")
+        
+        # Quick stats
+        try:
+            stats = get_history_stats()
+            total_claims = stats.get("total_claims", 0)
+            st.metric("📊 Total Claims Processed", total_claims)
+        except:
+            st.metric("📊 Total Claims Processed", 0)
+        
+        st.markdown("---")
+        
+        # Navigation links
+        st.subheader("🔗 Navigation")
         st.info("""
-            This tool uses **Google Gemini AI** to automatically extract structured information from insurance claim descriptions.
+            📜 **History** - View all processed claims
             
-            **Extracted Fields:**
-            - Loss Type
-            - Severity Level
-            - Affected Assets
-            - Estimated Loss
-            - Incident Date
-            - Location
-            - Confidence Score
-            - AI Explanation
+            ℹ️ **About** - Learn more about this tool
         """)
         
         st.markdown("---")
-        st.subheader("📚 Sample Claims")
         
-        # Load sample claims
-        try:
-            with open("sample_claims.txt", "r") as f:
-                sample_content = f.read()
-            
-            # Parse samples (crude but effective)
-            samples = []
-            current_sample = {"title": "", "text": ""}
-            for line in sample_content.split("\n"):
-                if line.startswith("# Sample"):
-                    if current_sample["text"]:
-                        samples.append(current_sample)
-                    current_sample = {"title": line.replace("#", "").strip(), "text": ""}
-                elif line.strip() and not line.startswith("#"):
-                    current_sample["text"] += line.strip() + " "
-            
-            if current_sample["text"]:
-                samples.append(current_sample)
-            
-            # Create buttons for samples
-            for sample in samples:
-                if st.button(sample["title"], key=sample["title"]):
-                    st.session_state.claim_input = sample["text"].strip()
+        # Sample claims grouped dropdown
+        st.subheader("📚 Load Sample Claim")
         
-        except FileNotFoundError:
-            st.warning("sample_claims.txt not found")
+        # Define grouped samples
+        sample_groups = {
+            "🚗 Vehicle Claims": [
+                ("Minor Car Accident", "Customer reported minor accident on rear bumper, scratches only, no injuries, estimated cost ₹7,000. Incident happened yesterday at parking lot near office."),
+                ("Flood Damage", "Vehicle submerged during flood, engine not starting, electrical damage suspected. Major repairs needed."),
+                ("Car Theft", "Vehicle stolen from residential parking area on Oct 28, 2025 around 3 AM. Honda Civic 2022 model, black color. Police report filed. Estimated value $25,000."),
+                ("Multi-Vehicle Collision", "Involved in 3-car collision on Highway 101 on Oct 30 at 8:15 AM. Front end damage to vehicle, airbags deployed. Driver has minor injuries - whiplash. Other vehicles also damaged. Police attended scene. Estimate pending insurance adjuster inspection."),
+            ],
+            "🏠 Property Claims": [
+                ("Kitchen Fire", "Fire reported in kitchen at 2:00 AM on Oct 15. Cabinets, microwave, and wall damaged. Customer estimates around $5000 damage. Fire department attended."),
+                ("Water Leakage", "Customer called about water leakage from ceiling damaging furniture below. Not sure when it started, probably last week."),
+                ("House Fire (Critical)", "Major house fire on Oct 29, 2025 at 11 PM on Maple Street. Entire second floor destroyed, first floor severely damaged by smoke and water from firefighting. Family evacuated safely. Total loss estimated over $200,000. Cause under investigation."),
+                ("Pipe Burst", "Pipe burst in basement overnight, water flooded entire basement area. Carpet, drywall, and stored items damaged. Incident discovered this morning. Plumber called for emergency repair. No cost estimate yet."),
+            ],
+            "🌪️ Weather Claims": [
+                ("Storm Damage", "Heavy storm last night caused tree branch to fall on vehicle roof. Windshield cracked, roof dented. No estimate yet. Happened at home driveway."),
+                ("Hail Damage", "Vehicle damaged by hail storm yesterday evening. Multiple dents on hood and roof, rear windshield cracked. Car was parked outside during storm. Preliminary estimate around $8,000."),
+            ],
+            "👤 Other Claims": [
+                ("Vandalism", "Customer reported vehicle vandalized with spray paint and broken side mirrors. Occurred somewhere between Oct 20-22 while parked on street. Estimated repair cost ₹15,000."),
+                ("Slip and Fall", "Customer slipped on wet floor in shopping mall on Oct 30, 2025 around 2 PM. Injured right ankle, medical treatment required. Mall located at City Center. Medical bills approximately $2,500."),
+            ],
+        }
+        
+        # Create flat list for dropdown with group labels
+        dropdown_options = ["-- Select a sample claim --"]
+        sample_map = {}
+        
+        for group_name, samples in sample_groups.items():
+            dropdown_options.append(group_name)
+            for title, text in samples:
+                option_label = f"  ↳ {title}"
+                dropdown_options.append(option_label)
+                sample_map[option_label] = text
+        
+        # Display dropdown
+        selected_sample = st.selectbox(
+            "Choose a sample:",
+            dropdown_options,
+            key="sample_selector",
+            label_visibility="collapsed"
+        )
+        
+        # Load sample when selected
+        if selected_sample in sample_map:
+            if st.button("Load This Sample", use_container_width=True):
+                st.session_state.claim_input = sample_map[selected_sample]
+                st.rerun()
         
         st.markdown("---")
         st.caption("Powered by Google Gemini 2.0 Flash")
@@ -347,6 +389,14 @@ def main():
         else:
             with st.spinner("🤖 Processing claim with Gemini AI..."):
                 extracted_data = process_claim(model, claim_input)
+                
+                # Save to history if successful (no errors)
+                if "error" not in extracted_data:
+                    try:
+                        record_id = save_claim_to_history(claim_input, extracted_data)
+                        st.toast(f"💾 Saved to history (ID: {record_id})", icon="✅")
+                    except Exception as e:
+                        st.warning(f"⚠️ Could not save to history: {str(e)}")
                 
                 # Display results
                 st.markdown("---")

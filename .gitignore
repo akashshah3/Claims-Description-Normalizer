@@ -36,6 +36,9 @@ wheels/
 # Streamlit
 .streamlit/
 
+# Database
+claims_history.db
+
 # OS
 .DS_Store
 Thumbs.db

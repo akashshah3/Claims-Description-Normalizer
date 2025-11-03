@@ -11,9 +11,16 @@ from database import (
     delete_history_item,
     search_history,
     get_history_stats,
-    clear_all_history
+    clear_all_history,
+    get_recommendations_by_claim_id,
+    has_recommendations
 )
-from utils import get_severity_color, get_confidence_color
+from utils import (
+    get_severity_color, 
+    get_confidence_color,
+    format_recommendations_compact,
+    generate_recommendations
+)
 
 # Page configuration
 st.set_page_config(
@@ -325,6 +332,44 @@ with col_right:
             st.markdown("#### 💡 AI Explanation")
             explanation = selected_claim.get("extraction_explanation", "No explanation available")
             st.write(explanation)
+            
+            st.markdown("---")
+            
+            # AI Recommendations Section
+            st.markdown("#### 🤖 AI Recommendations")
+            
+            # Initialize session state for recommendations expansion
+            if f"show_recommendations_{selected_claim['id']}" not in st.session_state:
+                st.session_state[f"show_recommendations_{selected_claim['id']}"] = False
+            
+            # Button to toggle recommendations
+            col_rec1, col_rec2 = st.columns([1, 3])
+            with col_rec1:
+                if st.button(
+                    "🔍 View Recommendations" if not st.session_state[f"show_recommendations_{selected_claim['id']}"] else "🔼 Hide Recommendations",
+                    key=f"toggle_rec_{selected_claim['id']}",
+                    use_container_width=True
+                ):
+                    st.session_state[f"show_recommendations_{selected_claim['id']}"] = not st.session_state[f"show_recommendations_{selected_claim['id']}"]
+                    st.rerun()
+            
+            # Display recommendations when expanded
+            if st.session_state[f"show_recommendations_{selected_claim['id']}"]:
+                with st.spinner("Loading recommendations..."):
+                    # Check if recommendations exist in database
+                    if has_recommendations(selected_claim['id']):
+                        # Load from database
+                        recommendations = get_recommendations_by_claim_id(selected_claim['id'])
+                        
+                        if recommendations:
+                            # Format and display
+                            recommendations_html = format_recommendations_compact(recommendations)
+                            st.markdown(recommendations_html, unsafe_allow_html=True)
+                        else:
+                            st.info("No recommendations found for this claim.")
+                    else:
+                        # Show message for old claims
+                        st.warning("⚠️ Recommendations are not available for claims processed before this feature was added. Only newly processed claims will have AI-powered recommendations.")
             
             st.markdown("---")
             

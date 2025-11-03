@@ -542,3 +542,78 @@ def get_priority_color(priority: str) -> str:
         "low": "#388E3C"        # Green
     }
     return priority_colors.get(priority.lower(), "#757575")
+
+
+def format_recommendations_compact(recommendations: List[Dict]) -> str:
+    """
+    Format recommendations as a compact, priority-grouped HTML list
+    
+    Args:
+        recommendations: List of recommendation dictionaries
+        
+    Returns:
+        HTML string with formatted recommendations
+    """
+    if not recommendations:
+        return "<p style='color: #666;'>No recommendations available.</p>"
+    
+    # Group by priority
+    priority_groups = {
+        "Critical": [],
+        "High": [],
+        "Medium": [],
+        "Low": []
+    }
+    
+    for rec in recommendations:
+        priority = rec.get("priority", "Medium")
+        if priority in priority_groups:
+            priority_groups[priority].append(rec)
+    
+    # Build HTML
+    html = ""
+    
+    for priority in ["Critical", "High", "Medium", "Low"]:
+        recs = priority_groups[priority]
+        if not recs:
+            continue
+        
+        color = get_priority_color(priority)
+        
+        # Priority header
+        icon_map = {
+            "Critical": "🚨",
+            "High": "⚠️",
+            "Medium": "📋",
+            "Low": "ℹ️"
+        }
+        
+        html += f'''
+        <div style="margin: 1rem 0;">
+            <div style="
+                background-color: {color}15;
+                border-left: 4px solid {color};
+                padding: 0.5rem 1rem;
+                border-radius: 4px 4px 0 0;
+                font-weight: 600;
+                color: {color};
+            ">
+                {icon_map.get(priority, "📋")} {priority} Priority ({len(recs)})
+            </div>
+            <ul style="
+                margin: 0;
+                padding: 1rem 1rem 1rem 2.5rem;
+                background-color: #f9f9f9;
+                border-radius: 0 0 4px 4px;
+                list-style: none;
+            ">
+        '''
+        
+        for rec in recs:
+            icon = rec.get("icon", "•")
+            action = rec.get("action", "Unknown action")
+            html += f'<li style="padding: 0.3rem 0; color: #333;"><span style="margin-right: 0.5rem;">{icon}</span>{action}</li>'
+        
+        html += '</ul></div>'
+    
+    return html

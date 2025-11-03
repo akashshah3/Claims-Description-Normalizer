@@ -35,6 +35,7 @@ from utils import (
 from database import (
     init_database,
     save_claim_to_history,
+    save_recommendations_to_history,
     get_all_history,
     get_history_by_id,
     delete_history_item,
@@ -56,6 +57,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
 
 # Custom CSS for better styling
 st.markdown("""
@@ -689,7 +692,14 @@ def main():
                 # Save to history if successful (no errors)
                 if "error" not in extracted_data:
                     try:
+                        # Save claim to history
                         record_id = save_claim_to_history(claim_input, extracted_data)
+                        
+                        # Generate and save recommendations
+                        recommendations = generate_recommendations(extracted_data)
+                        if recommendations:
+                            save_recommendations_to_history(record_id, recommendations)
+                        
                         st.toast(f"💾 Saved to history (ID: {record_id})", icon="✅")
                     except Exception as e:
                         st.warning(f"⚠️ Could not save to history: {str(e)}")

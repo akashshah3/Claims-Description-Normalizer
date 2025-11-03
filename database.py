@@ -36,6 +36,20 @@ def init_database():
         )
     """)
     
+    # Create recommendations table with foreign key to claim_history
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS claim_recommendations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            claim_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            category TEXT NOT NULL,
+            icon TEXT,
+            reasoning TEXT,
+            FOREIGN KEY (claim_id) REFERENCES claim_history(id) ON DELETE CASCADE
+        )
+    """)
+    
     conn.commit()
     conn.close()
 
@@ -381,3 +395,127 @@ def get_analytics_data() -> Dict:
         "severity_by_loss_type": severity_by_loss_type,
         "estimated_losses": [row[0] for row in estimated_losses]
     }
+
+
+def save_recommendations_to_history(claim_id: int, recommendations: List[Dict]) -> int:
+    """
+    Save recommendations for a specific claim
+    
+    Args:
+        claim_id: ID of the claim in claim_history table
+        recommendations: List of recommendation dictionaries
+        
+    Returns:
+        Number of recommendations saved
+    """
+    if not recommendations:
+        return 0
+    
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    # Insert each recommendation
+    for rec in recommendations:
+        cursor.execute("""
+            INSERT INTO claim_recommendations (
+                claim_id, action, priority, category, icon, reasoning
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            claim_id,
+            rec.get("action", ""),
+            rec.get("priority", "Medium"),
+            rec.get("category", "Processing"),
+            rec.get("icon", "📋"),
+            rec.get("reasoning", "")
+        ))
+    
+    rows_inserted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    
+    return rows_inserted
+
+
+def get_recommendations_by_claim_id(claim_id: int) -> List[Dict]:
+    """
+    Retrieve all recommendations for a specific claim
+    
+    Args:
+        claim_id: ID of the claim
+        
+    Returns:
+        List of recommendation dictionaries
+    """
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT action, priority, category, icon, reasoning
+        FROM claim_recommendations
+        WHERE claim_id = ?
+        ORDER BY 
+            CASE priority
+                WHEN 'Critical' THEN 1
+                WHEN 'High' THEN 2
+                WHEN 'Medium' THEN 3
+                WHEN 'Low' THEN 4
+                ELSE 5
+            END,
+            id
+    """, (claim_id,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    recommendations = [dict(row) for row in rows]
+    return recommendations
+
+
+def has_recommendations(claim_id: int) -> bool:
+    """
+    Check if a claim has recommendations stored
+    
+    Args:
+        claim_id: ID of the claim
+        
+    Returns:
+        True if recommendations exist, False otherwise
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT COUNT(*) FROM claim_recommendations
+        WHERE claim_id = ?
+    """, (claim_id,))
+    
+    count = cursor.fetchone()[0]
+    conn.close()
+    
+    return count > 0
+
+
+def delete_recommendations_by_claim_id(claim_id: int) -> int:
+    """
+    Delete all recommendations for a specific claim
+    
+    Args:
+        claim_id: ID of the claim
+        
+    Returns:
+        Number of recommendations deleted
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        DELETE FROM claim_recommendations
+        WHERE claim_id = ?
+    """, (claim_id,))
+    
+    rows_deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    
+    return rows_deleted

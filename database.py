@@ -271,3 +271,113 @@ def export_history_to_json(output_file: str = "claim_history_export.json"):
         json.dump(history, f, indent=2, ensure_ascii=False)
     
     return len(history)
+
+
+def get_analytics_data() -> Dict:
+    """
+    Get comprehensive analytics data for dashboard visualizations
+    
+    Returns:
+        Dictionary with analytics including:
+        - Loss type distribution
+        - Severity distribution
+        - Confidence distribution
+        - Claims over time
+        - Average confidence by severity
+        - Total claims and key metrics
+    """
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Total claims
+    cursor.execute("SELECT COUNT(*) FROM claim_history")
+    total_claims = cursor.fetchone()[0]
+    
+    # Loss type distribution
+    cursor.execute("""
+        SELECT loss_type, COUNT(*) as count
+        FROM claim_history
+        GROUP BY loss_type
+        ORDER BY count DESC
+    """)
+    loss_type_dist = [dict(row) for row in cursor.fetchall()]
+    
+    # Severity distribution
+    cursor.execute("""
+        SELECT severity, COUNT(*) as count
+        FROM claim_history
+        GROUP BY severity
+        ORDER BY 
+            CASE severity
+                WHEN 'Critical' THEN 1
+                WHEN 'High' THEN 2
+                WHEN 'Medium' THEN 3
+                WHEN 'Low' THEN 4
+                ELSE 5
+            END
+    """)
+    severity_dist = [dict(row) for row in cursor.fetchall()]
+    
+    # Confidence distribution
+    cursor.execute("""
+        SELECT confidence, COUNT(*) as count
+        FROM claim_history
+        GROUP BY confidence
+        ORDER BY 
+            CASE confidence
+                WHEN 'High' THEN 1
+                WHEN 'Medium' THEN 2
+                WHEN 'Low' THEN 3
+                ELSE 4
+            END
+    """)
+    confidence_dist = [dict(row) for row in cursor.fetchall()]
+    
+    # Claims over time (by date)
+    cursor.execute("""
+        SELECT DATE(timestamp) as date, COUNT(*) as count
+        FROM claim_history
+        GROUP BY DATE(timestamp)
+        ORDER BY date ASC
+    """)
+    claims_over_time = [dict(row) for row in cursor.fetchall()]
+    
+    # Average estimated loss (extract numeric values where possible)
+    cursor.execute("""
+        SELECT estimated_loss
+        FROM claim_history
+        WHERE estimated_loss IS NOT NULL 
+        AND estimated_loss != 'Not specified'
+        AND estimated_loss != 'Unknown'
+    """)
+    estimated_losses = cursor.fetchall()
+    
+    # Most recent claims
+    cursor.execute("""
+        SELECT MAX(timestamp) as last_claim,
+               MIN(timestamp) as first_claim
+        FROM claim_history
+    """)
+    date_range = dict(cursor.fetchone())
+    
+    # Severity by loss type
+    cursor.execute("""
+        SELECT loss_type, severity, COUNT(*) as count
+        FROM claim_history
+        GROUP BY loss_type, severity
+    """)
+    severity_by_loss_type = [dict(row) for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    return {
+        "total_claims": total_claims,
+        "loss_type_distribution": loss_type_dist,
+        "severity_distribution": severity_dist,
+        "confidence_distribution": confidence_dist,
+        "claims_over_time": claims_over_time,
+        "date_range": date_range,
+        "severity_by_loss_type": severity_by_loss_type,
+        "estimated_losses": [row[0] for row in estimated_losses]
+    }

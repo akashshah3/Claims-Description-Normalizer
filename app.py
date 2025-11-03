@@ -21,7 +21,9 @@ from utils import (
     get_confidence_percentage,
     validate_extracted_data,
     format_field_name,
-    create_summary_stats
+    create_summary_stats,
+    create_comparison_metrics,
+    calculate_token_count
 )
 from database import (
     init_database,
@@ -149,7 +151,13 @@ def display_results(claim_text: str, extracted_data: dict):
     st.success("✅ Claim successfully normalized!")
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Summary", "🔍 Detailed View", "💡 Explanation", "📝 JSON Output"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Summary", 
+        "🔍 Detailed View", 
+        "💡 Explanation", 
+        "📝 JSON Output",
+        "🔄 Comparison"
+    ])
     
     with tab1:
         st.subheader("Quick Summary")
@@ -261,6 +269,170 @@ def display_results(claim_text: str, extracted_data: dict):
             file_name=f"claim_extraction_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json"
         )
+    
+    with tab5:
+        st.subheader("🔄 Before vs After Comparison")
+        st.caption("Visual demonstration of data transformation quality")
+        
+        # Calculate comparison metrics
+        metrics = create_comparison_metrics(claim_text, extracted_data)
+        
+        # Display quality improvement metrics at the top
+        st.markdown("### 📊 Data Quality Improvements")
+        
+        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+        
+        with metric_col1:
+            st.metric(
+                label="Token Count",
+                value=f"{metrics['word_count']} words",
+                delta=f"{metrics['char_count']} chars",
+                delta_color="off"
+            )
+        
+        with metric_col2:
+            st.metric(
+                label="Structure Quality",
+                value=metrics['structure_quality'],
+                delta="Unstructured → Structured",
+                delta_color="normal"
+            )
+        
+        with metric_col3:
+            st.metric(
+                label="Completeness Score",
+                value=f"{metrics['completeness_percentage']:.0f}%",
+                delta=f"{metrics['fields_filled']}/{metrics['fields_total']} fields",
+                delta_color="normal"
+            )
+        
+        with metric_col4:
+            st.metric(
+                label="Confidence Level",
+                value=f"{metrics['confidence_percentage']}%",
+                delta=metrics['confidence'],
+                delta_color="normal"
+            )
+        
+        st.markdown("---")
+        
+        # Side-by-side comparison
+        col_before, col_after = st.columns(2)
+        
+        with col_before:
+            st.markdown("### 📝 BEFORE (Raw Input)")
+            
+            # Display original text in a warning-styled box
+            word_count, char_count = calculate_token_count(claim_text)
+            
+            st.markdown(f"""
+                <div style="
+                    background-color: #FFF9E6;
+                    border-left: 4px solid #FFA726;
+                    padding: 1.5rem;
+                    border-radius: 8px;
+                    margin: 1rem 0;
+                    min-height: 250px;
+                ">
+                    <div style="
+                        background-color: #FFE0B2;
+                        padding: 0.5rem;
+                        border-radius: 4px;
+                        margin-bottom: 1rem;
+                        text-align: center;
+                    ">
+                        <strong>⚠️ Unstructured Data</strong>
+                    </div>
+                    <p style="
+                        color: #333;
+                        line-height: 1.8;
+                        font-size: 14px;
+                        margin: 0;
+                    ">{claim_text}</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Metadata
+            st.caption(f"📏 {word_count} words | {char_count} characters")
+            st.caption("❌ No structure | ❌ Not machine-readable")
+        
+        with col_after:
+            st.markdown("### ✨ AFTER (Structured Output)")
+            
+            # Build complete HTML for the table (all in one string)
+            fields_display = [
+                ("loss_type", "🏷️ Loss Type"),
+                ("severity", "⚠️ Severity"),
+                ("affected_assets", "🎯 Affected Assets"),
+                ("estimated_loss", "💰 Estimated Loss"),
+                ("incident_date", "📅 Incident Date"),
+                ("location", "📍 Location"),
+                ("confidence", "🎯 Confidence"),
+            ]
+            
+            # Start building the complete HTML (no leading whitespace)
+            complete_html = '<div style="background-color: #E8F5E9; border-left: 4px solid #4CAF50; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; min-height: 250px;">'
+            complete_html += '<div style="background-color: #C8E6C9; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem; text-align: center;"><strong>✅ Structured Data</strong></div>'
+            complete_html += '<table style="width: 100%; border-collapse: collapse; color: #333;">'
+            
+            # Add table rows
+            for field_key, field_label in fields_display:
+                value = extracted_data.get(field_key, "Not specified")
+                
+                # Color code severity and confidence
+                if field_key == "severity":
+                    color = get_severity_color(value)
+                    value_html = f'<span style="color: {color}; font-weight: bold;">{value}</span>'
+                elif field_key == "confidence":
+                    color = get_confidence_color(value)
+                    value_html = f'<span style="color: {color}; font-weight: bold;">{value}</span>'
+                else:
+                    value_html = value
+                
+                complete_html += f'<tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px 4px; font-weight: 600; width: 45%;">{field_label}</td><td style="padding: 8px 4px;">{value_html}</td></tr>'
+            
+            # Close the table and div
+            complete_html += '</table></div>'
+            
+            # Render the complete HTML
+            st.markdown(complete_html, unsafe_allow_html=True)
+            
+            # Metadata
+            st.caption(f"✅ {metrics['fields_filled']} structured fields extracted")
+            st.caption("✅ Machine-readable | ✅ Database-ready")
+        
+        # Transformation summary
+        st.markdown("---")
+        st.markdown("### 🎯 Transformation Summary")
+        
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+        
+        with summary_col1:
+            st.markdown("""
+                <div style="text-align: center; padding: 1rem; background-color: #f0f2f6; border-radius: 8px;">
+                    <div style="font-size: 2em;">📄 → 📊</div>
+                    <div style="margin-top: 0.5rem; font-weight: 600;">Format</div>
+                    <div style="font-size: 0.9em; color: #666;">Plain Text → JSON</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with summary_col2:
+            st.markdown(f"""
+                <div style="text-align: center; padding: 1rem; background-color: #f0f2f6; border-radius: 8px;">
+                    <div style="font-size: 2em;">❌ → ✅</div>
+                    <div style="margin-top: 0.5rem; font-weight: 600;">Structure</div>
+                    <div style="font-size: 0.9em; color: #666;">Unstructured → {metrics['fields_filled']} Fields</div>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with summary_col3:
+            st.markdown(f"""
+                <div style="text-align: center; padding: 1rem; background-color: #f0f2f6; border-radius: 8px;">
+                    <div style="font-size: 2em;">🤖 → 💯</div>
+                    <div style="margin-top: 0.5rem; font-weight: 600;">Confidence</div>
+                    <div style="font-size: 0.9em; color: #666;">{metrics['confidence']} ({metrics['confidence_percentage']}%)</div>
+                </div>
+            """, unsafe_allow_html=True)
 
 
 def main():

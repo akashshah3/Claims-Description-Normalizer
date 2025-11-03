@@ -189,3 +189,110 @@ def create_summary_stats(data: Dict) -> Dict[str, str]:
         "Confidence": data.get("confidence", "Unknown"),
         "Estimated Loss": data.get("estimated_loss", "Not specified")
     }
+
+
+def calculate_token_count(text: str) -> Tuple[int, int]:
+    """
+    Calculate word count and character count for text
+    
+    Args:
+        text: Input text
+        
+    Returns:
+        Tuple of (word_count, char_count)
+    """
+    words = len(text.split())
+    chars = len(text)
+    return words, chars
+
+
+def calculate_completeness_score(extracted_data: Dict) -> Tuple[int, int, float]:
+    """
+    Calculate how many fields were successfully extracted
+    
+    Args:
+        extracted_data: Extracted data dictionary
+        
+    Returns:
+        Tuple of (filled_count, total_count, percentage)
+    """
+    required_fields = [
+        "loss_type",
+        "severity",
+        "affected_assets",
+        "estimated_loss",
+        "incident_date",
+        "location",
+        "confidence",
+        "extraction_explanation"
+    ]
+    
+    filled_count = 0
+    for field in required_fields:
+        value = extracted_data.get(field, "")
+        # Check if field has meaningful data
+        if value and value not in ["Unknown", "Not specified", "N/A", ""]:
+            filled_count += 1
+    
+    total_count = len(required_fields)
+    percentage = (filled_count / total_count) * 100 if total_count > 0 else 0
+    
+    return filled_count, total_count, percentage
+
+
+def get_structure_quality_indicator(extracted_data: Dict) -> str:
+    """
+    Get a visual indicator of structure quality
+    
+    Args:
+        extracted_data: Extracted data dictionary
+        
+    Returns:
+        HTML string with quality indicator
+    """
+    _, _, completeness = calculate_completeness_score(extracted_data)
+    
+    if completeness >= 90:
+        return "🟢 Excellent"
+    elif completeness >= 70:
+        return "🟡 Good"
+    elif completeness >= 50:
+        return "🟠 Fair"
+    else:
+        return "🔴 Poor"
+
+
+def create_comparison_metrics(claim_text: str, extracted_data: Dict) -> Dict:
+    """
+    Create comprehensive metrics for before/after comparison
+    
+    Args:
+        claim_text: Original claim text
+        extracted_data: Extracted structured data
+        
+    Returns:
+        Dictionary with comparison metrics
+    """
+    # Token counts
+    words, chars = calculate_token_count(claim_text)
+    
+    # Completeness
+    filled, total, completeness_pct = calculate_completeness_score(extracted_data)
+    
+    # Structure quality
+    structure_quality = get_structure_quality_indicator(extracted_data)
+    
+    # Confidence
+    confidence = extracted_data.get("confidence", "Unknown")
+    confidence_pct = get_confidence_percentage(confidence)
+    
+    return {
+        "word_count": words,
+        "char_count": chars,
+        "fields_filled": filled,
+        "fields_total": total,
+        "completeness_percentage": completeness_pct,
+        "structure_quality": structure_quality,
+        "confidence": confidence,
+        "confidence_percentage": confidence_pct
+    }

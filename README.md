@@ -42,9 +42,12 @@ estimated cost ₹7,000. Incident happened yesterday at parking lot near office.
 - **💡 Explainability**: AI explains *why* it made each classification decision
 - **🔍 Keyword Highlighting**: Highlights important phrases that influenced the AI's decision
 - **📈 Confidence Scoring**: Visual confidence meter with percentage indicators
+- **🔄 Comparison Mode**: Side-by-side before/after view with quality metrics
+- **📜 History Tracking**: SQLite database stores all processed claims with search & filters
+- **📈 Analytics Dashboard**: Interactive Plotly visualizations showing trends and insights
 - **🎨 Professional UI**: Clean, intuitive Streamlit interface with color-coded severity levels
 - **📥 Export Results**: Download extracted data as JSON
-- **📚 Sample Library**: 12 pre-loaded realistic claim examples
+- **📚 Sample Library**: 12 pre-loaded realistic claim examples organized by category
 
 ---
 
@@ -53,9 +56,15 @@ estimated cost ₹7,000. Incident happened yesterday at parking lot near office.
 ```
 Claims_Description_Normalizer/
 ├── app.py                    # Main Streamlit application
+├── database.py               # SQLite database operations for history
 ├── prompts.py                # Gemini prompt engineering & few-shot examples
 ├── utils.py                  # Helper functions (parsing, highlighting, validation)
+├── pages/                    # Streamlit multi-page app
+│   ├── 1_📜_History.py      # View and search claim history
+│   ├── 2_ℹ️_About.py        # About page
+│   └── 3_📈_Analytics.py    # Analytics dashboard with visualizations
 ├── requirements.txt          # Python dependencies
+├── claims_history.db         # SQLite database file (auto-generated)
 ├── .env                      # Environment variables (API key)
 ├── .env.example              # Template for environment setup
 ├── .gitignore                # Git ignore rules
@@ -126,9 +135,20 @@ Claims_Description_Normalizer/
    - **Detailed View**: All extracted fields in an organized layout
    - **Explanation**: AI's reasoning with highlighted keywords
    - **JSON Output**: Structured data ready for export
+   - **Comparison**: Side-by-side before/after view showing data transformation quality
 
-4. **Download Results** (Optional)
+4. **Explore Comparison Mode**
+   - See original messy text vs. clean structured output
+   - View quality metrics (Token Count, Structure Quality, Completeness, Confidence)
+   - Toggle between Table and JSON view
+   - Visual indicators show transformation improvements
+
+5. **Download Results** (Optional)
    - Click "Download JSON" to save the extracted data
+
+6. **Review History & Analytics**
+   - Navigate to "📜 History" page to view all processed claims
+   - Use "📈 Analytics" page for trends and insights
 
 ---
 
@@ -153,12 +173,24 @@ The app enhances the output:
 - Validates all required fields are present
 - Formats data for visual display
 
-### 4. **Visualization**
+### 4. **Comparison & Quality Metrics**
+The comparison mode visualizes the transformation:
+- **Before**: Original unstructured text with warning indicators
+- **After**: Clean structured table or JSON format
+- **Quality Metrics**:
+  - Token Count (words & characters)
+  - Structure Quality (visual indicator)
+  - Completeness Score (percentage of fields filled)
+  - Confidence Level (AI's certainty)
+- Side-by-side layout with color coding (yellow → green)
+
+### 5. **Visualization**
 Results are presented in an intuitive UI:
 - Color-coded severity levels (green/orange/red/purple)
 - Confidence meters and progress bars
 - Tabbed interface for different views
 - Professional card-based layout
+- Interactive comparison mode with toggles
 
 ---
 
@@ -196,6 +228,19 @@ Results are presented in an intuitive UI:
 - Progress bar showing confidence percentage
 - Expandable sections for detailed information
 - One-click JSON download
+- **Comparison Mode Features**:
+  - Side-by-side before/after view
+  - Toggle between Table and JSON output
+  - Real-time quality metrics
+  - Visual transformation indicators
+
+### Comparison Mode Highlights
+The **🔄 Comparison** tab provides:
+- **Quality Metrics Dashboard**: 4 key metrics showing transformation quality
+- **Before Panel**: Original text with unstructured data warning (yellow/orange theme)
+- **After Panel**: Structured output with success indicators (green theme)
+- **Transformation Summary**: Visual cards showing format, structure, and confidence improvements
+- **Flexible Views**: Switch between table and JSON formats
 
 ---
 

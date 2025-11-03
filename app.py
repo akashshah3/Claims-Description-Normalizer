@@ -11,7 +11,12 @@ import json
 from datetime import datetime
 
 # Import custom modules
-from prompts import build_prompt, GEMINI_CONFIG
+from prompts import (
+    build_prompt, 
+    GEMINI_CONFIG,
+    build_recommendation_reasoning_prompt,
+    RECOMMENDATION_REASONING_CONFIG
+)
 from utils import (
     parse_gemini_response,
     extract_keywords_from_explanation,
@@ -23,7 +28,9 @@ from utils import (
     format_field_name,
     create_summary_stats,
     create_comparison_metrics,
-    calculate_token_count
+    calculate_token_count,
+    generate_recommendations,
+    get_priority_color
 )
 from database import (
     init_database,
@@ -151,12 +158,13 @@ def display_results(claim_text: str, extracted_data: dict):
     st.success("✅ Claim successfully normalized!")
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 Summary", 
         "🔍 Detailed View", 
         "💡 Explanation", 
         "📝 JSON Output",
-        "🔄 Comparison"
+        "🔄 Comparison",
+        "🤖 Recommendations"
     ])
     
     with tab1:
@@ -433,6 +441,122 @@ def display_results(claim_text: str, extracted_data: dict):
                     <div style="font-size: 0.9em; color: #666;">{metrics['confidence']} ({metrics['confidence_percentage']}%)</div>
                 </div>
             """, unsafe_allow_html=True)
+    
+    with tab6:
+        st.subheader("🤖 AI-Powered Recommendations")
+        st.caption("Intelligent action suggestions for claims processing")
+        
+        # Generate rule-based recommendations
+        recommendations = generate_recommendations(extracted_data)
+        
+        if not recommendations:
+            st.info("No specific recommendations available for this claim.")
+        else:
+            # Display recommendations count and overview
+            st.markdown(f"### 📋 {len(recommendations)} Recommended Actions")
+            
+            # Group recommendations by priority
+            critical_recs = [r for r in recommendations if r['priority'].lower() == 'critical']
+            high_recs = [r for r in recommendations if r['priority'].lower() == 'high']
+            medium_recs = [r for r in recommendations if r['priority'].lower() == 'medium']
+            low_recs = [r for r in recommendations if r['priority'].lower() == 'low']
+            
+            # Priority summary
+            if critical_recs or high_recs:
+                priority_col1, priority_col2 = st.columns([3, 1])
+                with priority_col1:
+                    if critical_recs:
+                        st.error(f"🚨 {len(critical_recs)} Critical action(s) required")
+                    if high_recs:
+                        st.warning(f"⚠️ {len(high_recs)} High priority action(s) recommended")
+                with priority_col2:
+                    st.metric("Total Actions", len(recommendations))
+            
+            st.markdown("---")
+            
+            # Display recommendations as cards
+            for idx, rec in enumerate(recommendations):
+                priority_color = get_priority_color(rec['priority'])
+                
+                # Create card HTML
+                card_html = f"""
+                <div style="
+                    background: linear-gradient(to right, {priority_color}15, white);
+                    border-left: 5px solid {priority_color};
+                    border-radius: 10px;
+                    padding: 1.5rem;
+                    margin: 1rem 0;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                ">
+                    <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-size: 2em; margin-right: 0.5rem;">{rec['icon']}</span>
+                        <div>
+                            <h3 style="margin: 0; color: #333;">{rec['action']}</h3>
+                            <div style="display: flex; gap: 1rem; margin-top: 0.3rem;">
+                                <span style="
+                                    background-color: {priority_color};
+                                    color: white;
+                                    padding: 0.2rem 0.8rem;
+                                    border-radius: 12px;
+                                    font-size: 0.85em;
+                                    font-weight: 600;
+                                ">{rec['priority']} Priority</span>
+                                <span style="
+                                    background-color: #E0E0E0;
+                                    color: #555;
+                                    padding: 0.2rem 0.8rem;
+                                    border-radius: 12px;
+                                    font-size: 0.85em;
+                                ">{rec['category']}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="margin: 1rem 0 0 0; color: #555; line-height: 1.6;">
+                        <strong>Why:</strong> {rec['reasoning']}
+                    </p>
+                </div>
+                """
+                
+                st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Additional context section
+            st.markdown("---")
+            st.markdown("### 📊 Processing Context")
+            
+            context_col1, context_col2, context_col3 = st.columns(3)
+            
+            with context_col1:
+                severity = extracted_data.get("severity", "Unknown")
+                severity_color = get_severity_color(severity)
+                st.markdown(f"""
+                    <div style="text-align: center; padding: 1rem; background-color: #f5f5f5; border-radius: 8px;">
+                        <div style="font-size: 1.5em; color: {severity_color}; font-weight: bold;">{severity}</div>
+                        <div style="font-size: 0.9em; color: #666;">Severity Level</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with context_col2:
+                confidence = extracted_data.get("confidence", "Unknown")
+                confidence_color = get_confidence_color(confidence)
+                st.markdown(f"""
+                    <div style="text-align: center; padding: 1rem; background-color: #f5f5f5; border-radius: 8px;">
+                        <div style="font-size: 1.5em; color: {confidence_color}; font-weight: bold;">{confidence}</div>
+                        <div style="font-size: 0.9em; color: #666;">Confidence</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with context_col3:
+                loss_type = extracted_data.get("loss_type", "Unknown")
+                st.markdown(f"""
+                    <div style="text-align: center; padding: 1rem; background-color: #f5f5f5; border-radius: 8px;">
+                        <div style="font-size: 1.5em; color: #1976D2; font-weight: bold;">{loss_type}</div>
+                        <div style="font-size: 0.9em; color: #666;">Loss Type</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # Next steps summary
+            st.markdown("---")
+            st.info(f"💡 **Next Steps:** Review the {len(recommendations)} recommended actions above and prioritize based on your workflow. Actions marked as 'Critical' or 'High' priority should be addressed first.")
 
 
 def main():

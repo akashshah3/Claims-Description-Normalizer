@@ -111,3 +111,57 @@ GEMINI_CONFIG = {
     "top_k": 40,
     "max_output_tokens": 1024,
 }
+
+
+def build_recommendation_reasoning_prompt(claim_text: str, extracted_data: dict, recommendations: list) -> str:
+    """
+    Build a prompt to get AI reasoning for recommended actions
+    
+    Args:
+        claim_text: Original claim description
+        extracted_data: Extracted structured data
+        recommendations: List of recommended actions
+        
+    Returns:
+        Complete prompt string
+    """
+    
+    # Format recommendations for the prompt
+    rec_list = "\n".join([f"- {rec['action']}" for rec in recommendations])
+    
+    prompt = f"""You are an expert insurance claims adjuster providing guidance on claim processing.
+
+Based on the following claim information, provide brief reasoning for why each recommended action is important for this specific case. Keep each explanation to 1-2 sentences.
+
+CLAIM DETAILS:
+- Original Description: {claim_text}
+- Loss Type: {extracted_data.get('loss_type', 'Unknown')}
+- Severity: {extracted_data.get('severity', 'Unknown')}
+- Confidence: {extracted_data.get('confidence', 'Unknown')}
+- Estimated Loss: {extracted_data.get('estimated_loss', 'Not specified')}
+- Location: {extracted_data.get('location', 'Not specified')}
+- Incident Date: {extracted_data.get('incident_date', 'Not specified')}
+
+RECOMMENDED ACTIONS:
+{rec_list}
+
+For each action above, provide a brief, specific reason why it's recommended for THIS claim. Consider the severity, loss type, and specific circumstances mentioned.
+
+Format your response as a JSON object with action names as keys and reasoning as values. Example:
+{{
+  "Action Name 1": "Reasoning for this specific claim...",
+  "Action Name 2": "Reasoning for this specific claim..."
+}}
+
+Return ONLY the JSON object, no other text."""
+    
+    return prompt
+
+
+# Configuration for recommendation reasoning (slightly higher temperature for natural language)
+RECOMMENDATION_REASONING_CONFIG = {
+    "temperature": 0.5,
+    "top_p": 0.9,
+    "top_k": 40,
+    "max_output_tokens": 512,
+}

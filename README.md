@@ -43,6 +43,7 @@ estimated cost ₹7,000. Incident happened yesterday at parking lot near office.
 - **🔍 Keyword Highlighting**: Highlights important phrases that influenced the AI's decision
 - **📈 Confidence Scoring**: Visual confidence meter with percentage indicators
 - **🔄 Comparison Mode**: Side-by-side before/after view with quality metrics
+- **🤖 AI Recommendations**: Intelligent action suggestions based on claim severity, confidence, and type
 - **📜 History Tracking**: SQLite database stores all processed claims with search & filters
 - **📈 Analytics Dashboard**: Interactive Plotly visualizations showing trends and insights
 - **🎨 Professional UI**: Clean, intuitive Streamlit interface with color-coded severity levels
@@ -136,17 +137,23 @@ Claims_Description_Normalizer/
    - **Explanation**: AI's reasoning with highlighted keywords
    - **JSON Output**: Structured data ready for export
    - **Comparison**: Side-by-side before/after view showing data transformation quality
+   - **Recommendations**: AI-powered action suggestions for claim processing
 
-4. **Explore Comparison Mode**
+4. **Review AI Recommendations**
+   - See intelligent next-step suggestions based on claim analysis
+   - Actions prioritized by urgency (Critical, High, Medium, Low)
+   - Context-aware recommendations based on severity, loss type, and confidence
+   - Clear reasoning for each recommended action
+
+5. **Explore Comparison Mode**
    - See original messy text vs. clean structured output
    - View quality metrics (Token Count, Structure Quality, Completeness, Confidence)
-   - Toggle between Table and JSON view
    - Visual indicators show transformation improvements
 
-5. **Download Results** (Optional)
+6. **Download Results** (Optional)
    - Click "Download JSON" to save the extracted data
 
-6. **Review History & Analytics**
+7. **Review History & Analytics**
    - Navigate to "📜 History" page to view all processed claims
    - Use "📈 Analytics" page for trends and insights
 
@@ -184,13 +191,27 @@ The comparison mode visualizes the transformation:
   - Confidence Level (AI's certainty)
 - Side-by-side layout with color coding (yellow → green)
 
-### 5. **Visualization**
+### 5. **AI-Powered Recommendations**
+Intelligent action suggestions for claims adjusters:
+- **Rule-Based Logic**: Analyzes severity, confidence, loss type, and estimated cost
+- **Priority Levels**: Critical, High, Medium, Low
+- **Action Categories**: Processing, Verification, Documentation, Administrative, Communication
+- **Context-Aware**: Different recommendations based on specific claim characteristics
+- **Examples**:
+  - Low severity + high confidence → Fast-track approval
+  - High severity → Detailed investigation, senior adjuster assignment
+  - Theft claims → Verify police report
+  - High-value claims (>$50k) → Supervisor approval required
+  - Missing info → Request additional documentation
+
+### 6. **Visualization**
 Results are presented in an intuitive UI:
 - Color-coded severity levels (green/orange/red/purple)
 - Confidence meters and progress bars
 - Tabbed interface for different views
 - Professional card-based layout
 - Interactive comparison mode with toggles
+- Action cards with priority-based color coding
 
 ---
 

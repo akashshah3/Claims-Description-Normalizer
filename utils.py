@@ -296,3 +296,249 @@ def create_comparison_metrics(claim_text: str, extracted_data: Dict) -> Dict:
         "confidence": confidence,
         "confidence_percentage": confidence_pct
     }
+
+
+def parse_estimated_loss(loss_str: str) -> float:
+    """
+    Extract numeric value from estimated loss string
+    
+    Args:
+        loss_str: Estimated loss string (e.g., "₹7,000", "$5000", "Over $200,000")
+        
+    Returns:
+        Numeric value or 0 if not parseable
+    """
+    if not loss_str or loss_str.lower() in ["not specified", "unknown", "n/a"]:
+        return 0
+    
+    # Remove currency symbols and common words
+    cleaned = loss_str.lower().replace('₹', '').replace('$', '').replace('€', '')
+    cleaned = cleaned.replace('over', '').replace('around', '').replace('approximately', '')
+    cleaned = cleaned.replace(',', '').strip()
+    
+    try:
+        # Extract first number found
+        import re
+        numbers = re.findall(r'\d+\.?\d*', cleaned)
+        if numbers:
+            return float(numbers[0])
+    except:
+        pass
+    
+    return 0
+
+
+def generate_recommendations(extracted_data: Dict) -> List[Dict]:
+    """
+    Generate actionable recommendations based on claim data using rule-based logic
+    
+    Args:
+        extracted_data: Extracted claim data
+        
+    Returns:
+        List of recommendation dictionaries with action, priority, category, and icon
+    """
+    recommendations = []
+    
+    severity = extracted_data.get("severity", "Unknown").lower()
+    confidence = extracted_data.get("confidence", "Unknown").lower()
+    loss_type = extracted_data.get("loss_type", "Unknown").lower()
+    estimated_loss = parse_estimated_loss(extracted_data.get("estimated_loss", "0"))
+    incident_date = extracted_data.get("incident_date", "Not specified")
+    location = extracted_data.get("location", "Not specified")
+    
+    # Check for missing critical information
+    missing_info = []
+    if incident_date.lower() in ["not specified", "unknown"]:
+        missing_info.append("incident date")
+    if location.lower() in ["not specified", "unknown"]:
+        missing_info.append("location")
+    if estimated_loss == 0:
+        missing_info.append("cost estimate")
+    
+    # Rule 1: Low Confidence - Always request clarification
+    if confidence == "low":
+        recommendations.append({
+            "action": "Request Additional Documentation",
+            "priority": "High",
+            "category": "Verification",
+            "icon": "📄",
+            "reasoning": "Low confidence in data extraction. Need customer clarification to ensure accuracy."
+        })
+        recommendations.append({
+            "action": "Contact Customer for Details",
+            "priority": "High",
+            "category": "Communication",
+            "icon": "📞",
+            "reasoning": "Missing or unclear information requires direct customer contact."
+        })
+    
+    # Rule 2: Low Severity + High Confidence = Fast Track
+    if severity == "low" and confidence == "high" and estimated_loss < 10000:
+        recommendations.append({
+            "action": "Fast-track Approval",
+            "priority": "High",
+            "category": "Processing",
+            "icon": "🚀",
+            "reasoning": "Low severity with high confidence and minimal cost. Safe for quick approval."
+        })
+        recommendations.append({
+            "action": "Simple Phone Verification",
+            "priority": "Medium",
+            "category": "Verification",
+            "icon": "📞",
+            "reasoning": "Quick call to confirm details before approval."
+        })
+    
+    # Rule 3: Medium Severity = Standard Process
+    elif severity == "medium":
+        recommendations.append({
+            "action": "Standard Review Process",
+            "priority": "Medium",
+            "category": "Processing",
+            "icon": "📋",
+            "reasoning": "Medium severity requires standard assessment procedures."
+        })
+        recommendations.append({
+            "action": "Request Photos/Documentation",
+            "priority": "Medium",
+            "category": "Documentation",
+            "icon": "📸",
+            "reasoning": "Visual evidence needed to validate damage extent."
+        })
+        recommendations.append({
+            "action": "Schedule Assessment Within 5 Days",
+            "priority": "Medium",
+            "category": "Administrative",
+            "icon": "📅",
+            "reasoning": "Timely assessment ensures accurate damage evaluation."
+        })
+    
+    # Rule 4: High/Critical Severity = Intensive Review
+    elif severity in ["high", "critical"]:
+        recommendations.append({
+            "action": "Detailed Investigation Required",
+            "priority": "Critical",
+            "category": "Processing",
+            "icon": "🔍",
+            "reasoning": "High severity claim requires thorough investigation and documentation."
+        })
+        recommendations.append({
+            "action": "Assign Senior Adjuster",
+            "priority": "High",
+            "category": "Administrative",
+            "icon": "👨‍💼",
+            "reasoning": "Complex case requiring experienced adjuster expertise."
+        })
+        recommendations.append({
+            "action": "Schedule On-site Inspection",
+            "priority": "Critical",
+            "category": "Verification",
+            "icon": "🚨",
+            "reasoning": "Physical inspection mandatory for high-value claims."
+        })
+    
+    # Rule 5: High Value Claims (>$50,000)
+    if estimated_loss > 50000:
+        recommendations.append({
+            "action": "Supervisor Approval Required",
+            "priority": "Critical",
+            "category": "Administrative",
+            "icon": "👔",
+            "reasoning": f"Claim value (${estimated_loss:,.0f}) exceeds standard approval threshold."
+        })
+        recommendations.append({
+            "action": "Request Independent Assessment",
+            "priority": "High",
+            "category": "Verification",
+            "icon": "🔎",
+            "reasoning": "High-value claim requires third-party validation."
+        })
+    
+    # Rule 6: Loss Type Specific Recommendations
+    if "theft" in loss_type:
+        recommendations.append({
+            "action": "Verify Police Report",
+            "priority": "Critical",
+            "category": "Verification",
+            "icon": "🚔",
+            "reasoning": "Theft claims require official police documentation."
+        })
+    
+    if "fire" in loss_type:
+        recommendations.append({
+            "action": "Request Fire Department Report",
+            "priority": "High",
+            "category": "Documentation",
+            "icon": "🚒",
+            "reasoning": "Fire incident requires official fire department documentation."
+        })
+    
+    if "flood" in loss_type or "water" in loss_type:
+        recommendations.append({
+            "action": "Verify Weather Records",
+            "priority": "Medium",
+            "category": "Verification",
+            "icon": "🌧️",
+            "reasoning": "Cross-reference with official weather data for validation."
+        })
+    
+    if "accident" in loss_type or "collision" in loss_type:
+        recommendations.append({
+            "action": "Request Accident Report",
+            "priority": "High",
+            "category": "Documentation",
+            "icon": "📋",
+            "reasoning": "Vehicle accidents require official accident documentation."
+        })
+    
+    # Rule 7: Missing Information
+    if missing_info:
+        recommendations.append({
+            "action": f"Collect Missing Information",
+            "priority": "High",
+            "category": "Documentation",
+            "icon": "⚠️",
+            "reasoning": f"Critical fields missing: {', '.join(missing_info)}. Required for processing."
+        })
+    
+    # Rule 8: Urgent Cases (recent incidents)
+    if "today" in incident_date.lower() or "yesterday" in incident_date.lower():
+        recommendations.append({
+            "action": "Priority Processing",
+            "priority": "High",
+            "category": "Processing",
+            "icon": "⚡",
+            "reasoning": "Recent incident requires prompt attention and quick response."
+        })
+    
+    # If no specific recommendations, provide default
+    if not recommendations:
+        recommendations.append({
+            "action": "Standard Claim Processing",
+            "priority": "Medium",
+            "category": "Processing",
+            "icon": "📋",
+            "reasoning": "Process through standard workflow with routine verification."
+        })
+    
+    return recommendations
+
+
+def get_priority_color(priority: str) -> str:
+    """
+    Get color code for priority level
+    
+    Args:
+        priority: Priority level (Critical, High, Medium, Low)
+        
+    Returns:
+        Hex color code
+    """
+    priority_colors = {
+        "critical": "#D32F2F",  # Dark Red
+        "high": "#F57C00",      # Orange
+        "medium": "#FBC02D",    # Yellow
+        "low": "#388E3C"        # Green
+    }
+    return priority_colors.get(priority.lower(), "#757575")

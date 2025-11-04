@@ -42,3 +42,5 @@ claims_history.db
 # OS
 .DS_Store
 Thumbs.db
+
+todo.md

@@ -158,12 +158,35 @@ if not history:
     st.info("🔍 No claims found matching your filters.")
     st.stop()
 
-st.markdown(f"**Showing {len(history)} claim(s)**")
+# Pagination settings
+ITEMS_PER_PAGE = 5
+
+# Initialize pagination state
+if "current_page" not in st.session_state:
+    st.session_state.current_page = 1
+
+# Calculate total pages
+total_items = len(history)
+total_pages = (total_items + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE  # Ceiling division
+
+# Ensure current page is valid
+if st.session_state.current_page > total_pages:
+    st.session_state.current_page = total_pages
+if st.session_state.current_page < 1:
+    st.session_state.current_page = 1
+
+# Get current page items
+start_idx = (st.session_state.current_page - 1) * ITEMS_PER_PAGE
+end_idx = min(start_idx + ITEMS_PER_PAGE, total_items)
+current_page_history = history[start_idx:end_idx]
+
+# Display pagination info at top
+st.markdown(f"**Showing {start_idx + 1}-{end_idx} of {total_items} claim(s)** | Page {st.session_state.current_page} of {total_pages}")
 st.markdown("---")
 
 # Initialize selected claim
 if "selected_claim_id" not in st.session_state:
-    st.session_state.selected_claim_id = history[0]["id"]
+    st.session_state.selected_claim_id = current_page_history[0]["id"] if current_page_history else None
 
 # Main layout: Left-Right Split
 col_left, col_right = st.columns([4, 6])
@@ -173,7 +196,7 @@ with col_left:
     st.markdown("### 📋 Claims List")
     
     # Scrollable container for claims
-    for record in history:
+    for record in current_page_history:
         claim_id = record["id"]
         is_selected = st.session_state.selected_claim_id == claim_id
         
@@ -223,6 +246,18 @@ with col_left:
                 """, unsafe_allow_html=True)
             
             st.markdown("---")
+    
+    # Pagination controls at bottom
+    st.markdown("---")
+    col_prev, col_next = st.columns(2)
+    with col_prev:
+        if st.button("⬅️ Previous", disabled=(st.session_state.current_page <= 1), use_container_width=True, type="secondary"):
+            st.session_state.current_page -= 1
+            st.rerun()
+    with col_next:
+        if st.button("Next ➡️", disabled=(st.session_state.current_page >= total_pages), use_container_width=True, type="secondary"):
+            st.session_state.current_page += 1
+            st.rerun()
 
 # RIGHT COLUMN: Claim Details
 with col_right:

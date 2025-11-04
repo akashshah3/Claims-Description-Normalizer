@@ -343,15 +343,14 @@ with col_right:
                 st.session_state[f"show_recommendations_{selected_claim['id']}"] = False
             
             # Button to toggle recommendations
-            col_rec1, col_rec2 = st.columns([1, 3])
-            with col_rec1:
-                if st.button(
-                    "🔍 View Recommendations" if not st.session_state[f"show_recommendations_{selected_claim['id']}"] else "🔼 Hide Recommendations",
-                    key=f"toggle_rec_{selected_claim['id']}",
-                    use_container_width=True
-                ):
-                    st.session_state[f"show_recommendations_{selected_claim['id']}"] = not st.session_state[f"show_recommendations_{selected_claim['id']}"]
-                    st.rerun()
+            if st.button(
+                "🔍 View Recommendations" if not st.session_state[f"show_recommendations_{selected_claim['id']}"] else "🔼 Hide Recommendations",
+                key=f"toggle_rec_{selected_claim['id']}",
+                type="secondary",
+                use_container_width=True
+            ):
+                st.session_state[f"show_recommendations_{selected_claim['id']}"] = not st.session_state[f"show_recommendations_{selected_claim['id']}"]
+                st.rerun()
             
             # Display recommendations when expanded
             if st.session_state[f"show_recommendations_{selected_claim['id']}"]:

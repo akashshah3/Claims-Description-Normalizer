@@ -57,7 +57,7 @@ estimated cost ₹7,000. Incident happened yesterday at parking lot near office.
 ```
 Claims_Description_Normalizer/
 ├── app.py                    # Main Streamlit application
-├── database.py               # SQLite database operations for history
+├── database.py               # Database operations (SQLite or PostgreSQL)
 ├── prompts.py                # Gemini prompt engineering & few-shot examples
 ├── utils.py                  # Helper functions (parsing, highlighting, validation)
 ├── pages/                    # Streamlit multi-page app
@@ -65,11 +65,12 @@ Claims_Description_Normalizer/
 │   ├── 2_ℹ️_About.py        # About page
 │   └── 3_📈_Analytics.py    # Analytics dashboard with visualizations
 ├── requirements.txt          # Python dependencies
-├── claims_history.db         # SQLite database file (auto-generated)
-├── .env                      # Environment variables (API key)
+├── claims_history.db         # SQLite database file (auto-generated if using SQLite)
+├── .env                      # Environment variables (API key, database config)
 ├── .env.example              # Template for environment setup
 ├── .gitignore                # Git ignore rules
 ├── sample_claims.txt         # 12 realistic sample claims for testing
+├── test_database.py          # Database connection test script
 └── README.md                 # This file
 ```
 
@@ -109,6 +110,20 @@ Claims_Description_Normalizer/
    Edit `.env` and add your Gemini API key:
    ```
    GEMINI_API_KEY=your_api_key_here
+   
+   # Database Configuration (Optional)
+   DATABASE_TYPE=sqlite          # Options: 'sqlite' or 'postgresql'
+   DATABASE_URL=                 # Only needed for PostgreSQL
+   ```
+   
+   **Database Options:**
+   - **SQLite (Default)**: Local file-based database, perfect for development
+   - **PostgreSQL (Supabase)**: Cloud database for production, multi-user scenarios
+   
+   For Supabase PostgreSQL:
+   ```bash
+   DATABASE_TYPE=postgresql
+   DATABASE_URL=postgresql://user:password@host:port/database
    ```
 
 5. **Run the application**
@@ -266,6 +281,61 @@ The **🔄 Comparison** tab provides:
 ---
 
 ## 🔧 Configuration
+
+### Database Configuration
+
+The application supports **two database options**:
+
+#### Option 1: SQLite (Default - Local Storage)
+- **Best for**: Development, single-user, local deployment
+- **Storage**: Local file (`claims_history.db`)
+- **Setup**: Zero configuration, works out of the box
+- **Pros**: Simple, no network dependency, portable
+- **Cons**: Not suitable for multi-user production environments
+
+```bash
+# .env file
+DATABASE_TYPE=sqlite
+# DATABASE_URL not needed
+```
+
+#### Option 2: PostgreSQL via Supabase (Cloud Storage)
+- **Best for**: Production, multi-user, cloud deployment
+- **Storage**: Cloud-hosted PostgreSQL database
+- **Setup**: Requires Supabase account and connection string
+- **Pros**: Scalable, supports multiple users, automatic backups, connection pooling
+- **Cons**: Requires internet connection
+
+```bash
+# .env file
+DATABASE_TYPE=postgresql
+DATABASE_URL=postgresql://user:password@host:port/database
+```
+
+**Getting Supabase PostgreSQL URL:**
+1. Sign up at [supabase.com](https://supabase.com/)
+2. Create a new project
+3. Go to Project Settings → Database
+4. Copy the "Connection pooling" connection string (Port 6543)
+5. Add to your `.env` file
+
+**Testing Database Connection:**
+```bash
+python test_database.py
+```
+
+**Switching Between Databases:**
+- Simply change `DATABASE_TYPE` in `.env`
+- No code changes needed
+- The app automatically adapts to the selected database
+
+**Migration (Optional):**
+If you have existing SQLite data and want to move to PostgreSQL, you can:
+1. Export your data using the History page (JSON export)
+2. Switch to PostgreSQL configuration
+3. Import the data manually or contact support for migration scripts
+
+---
 
 ### Gemini API Settings
 Adjust in `prompts.py`:

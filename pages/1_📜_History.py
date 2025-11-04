@@ -94,11 +94,15 @@ with col3:
     last_date = stats.get("last_claim_date", "N/A")
     if last_date and last_date != "N/A":
         try:
-            dt = datetime.strptime(last_date, "%Y-%m-%d %H:%M:%S")
-            last_date = dt.strftime("%b %d, %I:%M %p")
+            # Handle both string and datetime object
+            if isinstance(last_date, datetime):
+                last_date = last_date.strftime("%b %d, %I:%M %p")
+            else:
+                dt = datetime.strptime(last_date, "%Y-%m-%d %H:%M:%S")
+                last_date = dt.strftime("%b %d, %I:%M %p")
         except:
-            pass
-    st.metric("🕐 Last Processed", last_date)
+            last_date = str(last_date)
+    st.metric("🕐 Last Processed", str(last_date))
 
 with col4:
     high_severity = severity_breakdown.get("High", 0) + severity_breakdown.get("Critical", 0)
@@ -203,10 +207,14 @@ with col_left:
         # Format timestamp
         timestamp = record.get("timestamp", "Unknown")
         try:
-            dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-            formatted_time = dt.strftime("%b %d, %I:%M %p")
+            # Handle both string and datetime object
+            if isinstance(timestamp, datetime):
+                formatted_time = timestamp.strftime("%b %d, %I:%M %p")
+            else:
+                dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                formatted_time = dt.strftime("%b %d, %I:%M %p")
         except:
-            formatted_time = timestamp
+            formatted_time = str(timestamp)
         
         # Claim preview
         claim_preview = record.get("claim_text", "")[:80]
@@ -272,10 +280,14 @@ with col_right:
             # Timestamp
             timestamp = selected_claim.get("timestamp", "Unknown")
             try:
-                dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-                formatted_time = dt.strftime("%B %d, %Y at %I:%M %p")
+                # Handle both string and datetime object
+                if isinstance(timestamp, datetime):
+                    formatted_time = timestamp.strftime("%B %d, %Y at %I:%M %p")
+                else:
+                    dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                    formatted_time = dt.strftime("%B %d, %Y at %I:%M %p")
             except:
-                formatted_time = timestamp
+                formatted_time = str(timestamp)
             
             st.info(f"🕐 **Processed:** {formatted_time}")
             

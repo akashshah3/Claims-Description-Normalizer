@@ -1,54 +1,153 @@
 """
-Database operations for Claims History using SQLite
+Database operations for Claims History
+Supports both SQLite (local) and PostgreSQL (Supabase cloud)
 """
 
 import sqlite3
 import json
+import os
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
-# Database file path
+# Database configuration
+DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite").lower()
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+# SQLite file path (only used when DATABASE_TYPE=sqlite)
 DB_FILE = Path(__file__).parent / "claims_history.db"
+
+# Import PostgreSQL adapter only if needed
+if DATABASE_TYPE == "postgresql":
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+    except ImportError:
+        raise ImportError(
+            "psycopg2 is required for PostgreSQL support. "
+            "Install it with: pip install psycopg2-binary"
+        )
+
+
+def get_connection():
+    """
+    Get database connection based on DATABASE_TYPE
+    
+    Returns:
+        Database connection object
+    """
+    if DATABASE_TYPE == "postgresql":
+        if not DATABASE_URL:
+            raise ValueError("DATABASE_URL must be set when using PostgreSQL")
+        return psycopg2.connect(DATABASE_URL)
+    else:
+        return sqlite3.connect(DB_FILE)
+
+
+def get_cursor(conn):
+    """
+    Get appropriate cursor for the database type
+    
+    Args:
+        conn: Database connection
+        
+    Returns:
+        Cursor object with appropriate row factory
+    """
+    if DATABASE_TYPE == "postgresql":
+        return conn.cursor(cursor_factory=RealDictCursor)
+    else:
+        conn.row_factory = sqlite3.Row
+        return conn.cursor()
+
+
+def adapt_placeholder(query: str) -> str:
+    """
+    Adapt query placeholders based on database type
+    SQLite uses ?, PostgreSQL uses %s
+    
+    Args:
+        query: SQL query string with ? placeholders
+        
+    Returns:
+        Query string with appropriate placeholders
+    """
+    if DATABASE_TYPE == "postgresql":
+        return query.replace("?", "%s")
+    return query
 
 
 def init_database():
     """
-    Initialize the SQLite database and create tables if they don't exist
+    Initialize the database and create tables if they don't exist
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS claim_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            claim_text TEXT NOT NULL,
-            loss_type TEXT,
-            severity TEXT,
-            affected_assets TEXT,
-            estimated_loss TEXT,
-            incident_date TEXT,
-            location TEXT,
-            confidence TEXT,
-            extraction_explanation TEXT
-        )
-    """)
-    
-    # Create recommendations table with foreign key to claim_history
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS claim_recommendations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            claim_id INTEGER NOT NULL,
-            action TEXT NOT NULL,
-            priority TEXT NOT NULL,
-            category TEXT NOT NULL,
-            icon TEXT,
-            reasoning TEXT,
-            FOREIGN KEY (claim_id) REFERENCES claim_history(id) ON DELETE CASCADE
-        )
-    """)
+    if DATABASE_TYPE == "postgresql":
+        # PostgreSQL schema
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS claim_history (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                claim_text TEXT NOT NULL,
+                loss_type TEXT,
+                severity TEXT,
+                affected_assets TEXT,
+                estimated_loss TEXT,
+                incident_date TEXT,
+                location TEXT,
+                confidence TEXT,
+                extraction_explanation TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS claim_recommendations (
+                id SERIAL PRIMARY KEY,
+                claim_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                category TEXT NOT NULL,
+                icon TEXT,
+                reasoning TEXT,
+                FOREIGN KEY (claim_id) REFERENCES claim_history(id) ON DELETE CASCADE
+            )
+        """)
+    else:
+        # SQLite schema
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS claim_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                claim_text TEXT NOT NULL,
+                loss_type TEXT,
+                severity TEXT,
+                affected_assets TEXT,
+                estimated_loss TEXT,
+                incident_date TEXT,
+                location TEXT,
+                confidence TEXT,
+                extraction_explanation TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS claim_recommendations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                category TEXT NOT NULL,
+                icon TEXT,
+                reasoning TEXT,
+                FOREIGN KEY (claim_id) REFERENCES claim_history(id) ON DELETE CASCADE
+            )
+        """)
     
     conn.commit()
     conn.close()
@@ -65,28 +164,49 @@ def save_claim_to_history(claim_text: str, extracted_data: Dict) -> int:
     Returns:
         ID of the inserted record
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        INSERT INTO claim_history (
-            claim_text, loss_type, severity, affected_assets,
-            estimated_loss, incident_date, location, confidence,
-            extraction_explanation
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        claim_text,
-        extracted_data.get("loss_type", "Unknown"),
-        extracted_data.get("severity", "Unknown"),
-        extracted_data.get("affected_assets", "Not specified"),
-        extracted_data.get("estimated_loss", "Not specified"),
-        extracted_data.get("incident_date", "Not specified"),
-        extracted_data.get("location", "Not specified"),
-        extracted_data.get("confidence", "Unknown"),
-        extracted_data.get("extraction_explanation", "")
-    ))
+    if DATABASE_TYPE == "postgresql":
+        cursor.execute("""
+            INSERT INTO claim_history (
+                claim_text, loss_type, severity, affected_assets,
+                estimated_loss, incident_date, location, confidence,
+                extraction_explanation
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            claim_text,
+            extracted_data.get("loss_type", "Unknown"),
+            extracted_data.get("severity", "Unknown"),
+            extracted_data.get("affected_assets", "Not specified"),
+            extracted_data.get("estimated_loss", "Not specified"),
+            extracted_data.get("incident_date", "Not specified"),
+            extracted_data.get("location", "Not specified"),
+            extracted_data.get("confidence", "Unknown"),
+            extracted_data.get("extraction_explanation", "")
+        ))
+        record_id = cursor.fetchone()[0]
+    else:
+        cursor.execute("""
+            INSERT INTO claim_history (
+                claim_text, loss_type, severity, affected_assets,
+                estimated_loss, incident_date, location, confidence,
+                extraction_explanation
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            claim_text,
+            extracted_data.get("loss_type", "Unknown"),
+            extracted_data.get("severity", "Unknown"),
+            extracted_data.get("affected_assets", "Not specified"),
+            extracted_data.get("estimated_loss", "Not specified"),
+            extracted_data.get("incident_date", "Not specified"),
+            extracted_data.get("location", "Not specified"),
+            extracted_data.get("confidence", "Unknown"),
+            extracted_data.get("extraction_explanation", "")
+        ))
+        record_id = cursor.lastrowid
     
-    record_id = cursor.lastrowid
     conn.commit()
     conn.close()
     
@@ -103,21 +223,28 @@ def get_all_history(limit: int = 100) -> List[Dict]:
     Returns:
         List of claim history dictionaries
     """
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row  # Enable column access by name
-    cursor = conn.cursor()
+    conn = get_connection()
+    cursor = get_cursor(conn)
     
-    cursor.execute("""
+    query = adapt_placeholder("""
         SELECT * FROM claim_history
         ORDER BY timestamp DESC
         LIMIT ?
-    """, (limit,))
+    """)
     
+    cursor.execute(query, (limit,))
     rows = cursor.fetchall()
     conn.close()
     
     # Convert to list of dictionaries
     history = [dict(row) for row in rows]
+    
+    # Convert datetime objects to strings for PostgreSQL
+    if DATABASE_TYPE == "postgresql":
+        for record in history:
+            if 'timestamp' in record and isinstance(record['timestamp'], datetime):
+                record['timestamp'] = record['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+    
     return history
 
 
@@ -131,20 +258,25 @@ def get_history_by_id(record_id: int) -> Optional[Dict]:
     Returns:
         Claim history dictionary or None if not found
     """
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_connection()
+    cursor = get_cursor(conn)
     
-    cursor.execute("""
+    query = adapt_placeholder("""
         SELECT * FROM claim_history
         WHERE id = ?
-    """, (record_id,))
+    """)
     
+    cursor.execute(query, (record_id,))
     row = cursor.fetchone()
     conn.close()
     
     if row:
-        return dict(row)
+        record = dict(row)
+        # Convert datetime objects to strings for PostgreSQL
+        if DATABASE_TYPE == "postgresql" and 'timestamp' in record:
+            if isinstance(record['timestamp'], datetime):
+                record['timestamp'] = record['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+        return record
     return None
 
 
@@ -158,15 +290,17 @@ def delete_history_item(record_id: int) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
+    query = adapt_placeholder("""
         DELETE FROM claim_history
         WHERE id = ?
-    """, (record_id,))
+    """)
     
+    cursor.execute(query, (record_id,))
     rows_affected = cursor.rowcount
+    
     conn.commit()
     conn.close()
     
@@ -189,22 +323,24 @@ def search_history(
     Returns:
         List of matching claim history dictionaries
     """
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_connection()
+    cursor = get_cursor(conn)
     
     query = "SELECT * FROM claim_history WHERE 1=1"
     params = []
     
     if keyword:
-        query += " AND claim_text LIKE ?"
+        if DATABASE_TYPE == "postgresql":
+            query += " AND claim_text ILIKE %s"
+        else:
+            query += " AND claim_text LIKE ?"
         params.append(f"%{keyword}%")
     
     if severity:
-        query += " AND severity = ?"
+        query += " AND severity = " + ("%s" if DATABASE_TYPE == "postgresql" else "?")
         params.append(severity)
     
-    query += " ORDER BY timestamp DESC LIMIT ?"
+    query += " ORDER BY timestamp DESC LIMIT " + ("%s" if DATABASE_TYPE == "postgresql" else "?")
     params.append(limit)
     
     cursor.execute(query, params)
@@ -212,6 +348,13 @@ def search_history(
     conn.close()
     
     history = [dict(row) for row in rows]
+    
+    # Convert datetime objects to strings for PostgreSQL
+    if DATABASE_TYPE == "postgresql":
+        for record in history:
+            if 'timestamp' in record and isinstance(record['timestamp'], datetime):
+                record['timestamp'] = record['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+    
     return history
 
 
@@ -222,12 +365,16 @@ def get_history_stats() -> Dict:
     Returns:
         Dictionary with statistics (total count, severity breakdown, etc.)
     """
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    conn = get_connection()
+    cursor = conn.cursor()  # Use plain cursor for simple queries
     
     # Total count
-    cursor.execute("SELECT COUNT(*) FROM claim_history")
-    total_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) as count FROM claim_history")
+    result = cursor.fetchone()
+    if DATABASE_TYPE == "postgresql":
+        total_count = result[0] if result else 0
+    else:
+        total_count = result[0] if result else 0
     
     # Severity breakdown
     cursor.execute("""
@@ -238,8 +385,17 @@ def get_history_stats() -> Dict:
     severity_breakdown = dict(cursor.fetchall())
     
     # Most recent timestamp
-    cursor.execute("SELECT MAX(timestamp) FROM claim_history")
-    last_claim = cursor.fetchone()[0]
+    cursor.execute("SELECT MAX(timestamp) as max_timestamp FROM claim_history")
+    result = cursor.fetchone()
+    if DATABASE_TYPE == "postgresql":
+        last_claim = result[0] if result else None
+    else:
+        last_claim = result[0] if result else None
+    
+    # Convert datetime to string for PostgreSQL
+    if DATABASE_TYPE == "postgresql" and last_claim:
+        if isinstance(last_claim, datetime):
+            last_claim = last_claim.strftime('%Y-%m-%d %H:%M:%S')
     
     conn.close()
     
@@ -257,7 +413,7 @@ def clear_all_history() -> int:
     Returns:
         Number of records deleted
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute("DELETE FROM claim_history")
@@ -281,8 +437,14 @@ def export_history_to_json(output_file: str = "claim_history_export.json"):
     """
     history = get_all_history(limit=10000)  # Export all
     
+    # Convert datetime objects to strings for JSON serialization
+    for record in history:
+        if 'timestamp' in record and record['timestamp']:
+            if isinstance(record['timestamp'], datetime):
+                record['timestamp'] = record['timestamp'].isoformat()
+    
     with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
+        json.dump(history, f, indent=2, ensure_ascii=False, default=str)
     
     return len(history)
 
@@ -300,13 +462,16 @@ def get_analytics_data() -> Dict:
         - Average confidence by severity
         - Total claims and key metrics
     """
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_connection()
+    cursor = get_cursor(conn)
     
     # Total claims
-    cursor.execute("SELECT COUNT(*) FROM claim_history")
-    total_claims = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) as count FROM claim_history")
+    result = cursor.fetchone()
+    if DATABASE_TYPE == "postgresql":
+        total_claims = result['count'] if result else 0
+    else:
+        total_claims = result[0] if result else 0
     
     # Loss type distribution
     cursor.execute("""
@@ -373,7 +538,8 @@ def get_analytics_data() -> Dict:
                MIN(timestamp) as first_claim
         FROM claim_history
     """)
-    date_range = dict(cursor.fetchone())
+    date_range_row = cursor.fetchone()
+    date_range = dict(date_range_row) if date_range_row else {}
     
     # Severity by loss type
     cursor.execute("""
@@ -385,6 +551,24 @@ def get_analytics_data() -> Dict:
     
     conn.close()
     
+    # Extract estimated loss values
+    if DATABASE_TYPE == "postgresql":
+        loss_values = [row['estimated_loss'] for row in estimated_losses]
+    else:
+        loss_values = [row[0] for row in estimated_losses]
+    
+    # Convert datetime objects to strings for compatibility
+    for record in claims_over_time:
+        if 'date' in record and isinstance(record['date'], datetime):
+            record['date'] = record['date'].strftime('%Y-%m-%d')
+    
+    # Convert date_range datetime objects to strings
+    if date_range:
+        for key in ['last_claim', 'first_claim']:
+            if key in date_range and date_range[key]:
+                if isinstance(date_range[key], datetime):
+                    date_range[key] = date_range[key].strftime('%Y-%m-%d %H:%M:%S')
+    
     return {
         "total_claims": total_claims,
         "loss_type_distribution": loss_type_dist,
@@ -393,7 +577,7 @@ def get_analytics_data() -> Dict:
         "claims_over_time": claims_over_time,
         "date_range": date_range,
         "severity_by_loss_type": severity_by_loss_type,
-        "estimated_losses": [row[0] for row in estimated_losses]
+        "estimated_losses": loss_values
     }
 
 
@@ -411,25 +595,41 @@ def save_recommendations_to_history(claim_id: int, recommendations: List[Dict]) 
     if not recommendations:
         return 0
     
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
+    
+    rows_inserted = 0
     
     # Insert each recommendation
     for rec in recommendations:
-        cursor.execute("""
-            INSERT INTO claim_recommendations (
-                claim_id, action, priority, category, icon, reasoning
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            claim_id,
-            rec.get("action", ""),
-            rec.get("priority", "Medium"),
-            rec.get("category", "Processing"),
-            rec.get("icon", "📋"),
-            rec.get("reasoning", "")
-        ))
+        if DATABASE_TYPE == "postgresql":
+            cursor.execute("""
+                INSERT INTO claim_recommendations (
+                    claim_id, action, priority, category, icon, reasoning
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                claim_id,
+                rec.get("action", ""),
+                rec.get("priority", "Medium"),
+                rec.get("category", "Processing"),
+                rec.get("icon", "📋"),
+                rec.get("reasoning", "")
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO claim_recommendations (
+                    claim_id, action, priority, category, icon, reasoning
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                claim_id,
+                rec.get("action", ""),
+                rec.get("priority", "Medium"),
+                rec.get("category", "Processing"),
+                rec.get("icon", "📋"),
+                rec.get("reasoning", "")
+            ))
+        rows_inserted += 1
     
-    rows_inserted = cursor.rowcount
     conn.commit()
     conn.close()
     
@@ -446,11 +646,10 @@ def get_recommendations_by_claim_id(claim_id: int) -> List[Dict]:
     Returns:
         List of recommendation dictionaries
     """
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_connection()
+    cursor = get_cursor(conn)
     
-    cursor.execute("""
+    query = adapt_placeholder("""
         SELECT action, priority, category, icon, reasoning
         FROM claim_recommendations
         WHERE claim_id = ?
@@ -463,8 +662,9 @@ def get_recommendations_by_claim_id(claim_id: int) -> List[Dict]:
                 ELSE 5
             END,
             id
-    """, (claim_id,))
+    """)
     
+    cursor.execute(query, (claim_id,))
     rows = cursor.fetchall()
     conn.close()
     
@@ -482,15 +682,17 @@ def has_recommendations(claim_id: int) -> bool:
     Returns:
         True if recommendations exist, False otherwise
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT COUNT(*) FROM claim_recommendations
+    query = adapt_placeholder("""
+        SELECT COUNT(*) as count FROM claim_recommendations
         WHERE claim_id = ?
-    """, (claim_id,))
+    """)
     
-    count = cursor.fetchone()[0]
+    cursor.execute(query, (claim_id,))
+    result = cursor.fetchone()
+    count = result[0] if result else 0
     conn.close()
     
     return count > 0
@@ -506,16 +708,34 @@ def delete_recommendations_by_claim_id(claim_id: int) -> int:
     Returns:
         Number of recommendations deleted
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
+    query = adapt_placeholder("""
         DELETE FROM claim_recommendations
         WHERE claim_id = ?
-    """, (claim_id,))
+    """)
     
+    cursor.execute(query, (claim_id,))
     rows_deleted = cursor.rowcount
+    
     conn.commit()
     conn.close()
     
     return rows_deleted
+
+
+# Utility function to get database info
+def get_database_info() -> Dict:
+    """
+    Get information about the current database configuration
+    
+    Returns:
+        Dictionary with database type and connection info
+    """
+    info = {
+        "database_type": DATABASE_TYPE,
+        "database_file": str(DB_FILE) if DATABASE_TYPE == "sqlite" else None,
+        "database_host": DATABASE_URL.split("@")[1].split("/")[0] if DATABASE_TYPE == "postgresql" and DATABASE_URL else None
+    }
+    return info

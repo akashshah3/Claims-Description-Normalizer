@@ -47,16 +47,21 @@ from database import (
 # Load environment variables
 load_dotenv()
 
-# Initialize database
-init_database()
-
-# Page configuration
+# Page configuration - MUST be first Streamlit command
 st.set_page_config(
     page_title="Claims Description Normalizer",
     page_icon="📋",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize database (after page config)
+try:
+    init_database()
+except Exception as e:
+    st.error(f"❌ Database initialization failed: {str(e)}")
+    st.info("💡 Tip: Check your database configuration in .env or Streamlit Cloud secrets.")
+    st.stop()
 
 
 

@@ -14,7 +14,35 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Database configuration
+# Database configuration helper
+_config_cache = {"type": None, "url": None}
+
+def get_database_config():
+    """Get database configuration from Streamlit secrets or environment variables"""
+    # Return cached config if available
+    if _config_cache["type"] is not None:
+        return _config_cache["type"], _config_cache["url"]
+    
+    # Try Streamlit secrets first (only works after streamlit is initialized)
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'DATABASE_TYPE' in st.secrets:
+            db_type = st.secrets.get("DATABASE_TYPE", "sqlite").lower()
+            db_url = st.secrets.get("DATABASE_URL", "")
+            _config_cache["type"] = db_type
+            _config_cache["url"] = db_url
+            return db_type, db_url
+    except:
+        pass
+    
+    # Fallback to environment variables
+    db_type = os.getenv("DATABASE_TYPE", "sqlite").lower()
+    db_url = os.getenv("DATABASE_URL", "")
+    _config_cache["type"] = db_type
+    _config_cache["url"] = db_url
+    return db_type, db_url
+
+# Get initial configuration from environment variables only (no streamlit import)
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite").lower()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
@@ -40,10 +68,22 @@ def get_connection():
     Returns:
         Database connection object
     """
-    if DATABASE_TYPE == "postgresql":
-        if not DATABASE_URL:
-            raise ValueError("DATABASE_URL must be set when using PostgreSQL")
-        return psycopg2.connect(DATABASE_URL)
+    # Get current configuration (checks Streamlit secrets if available)
+    db_type, db_url = get_database_config()
+    
+    if db_type == "postgresql":
+        if not db_url:
+            raise ValueError(
+                "DATABASE_URL must be set when using PostgreSQL. "
+                "Please set DATABASE_URL in your .env file or Streamlit Cloud secrets."
+            )
+        try:
+            return psycopg2.connect(db_url)
+        except Exception as e:
+            raise ConnectionError(
+                f"Failed to connect to PostgreSQL database: {str(e)}. "
+                "Please check your DATABASE_URL configuration."
+            )
     else:
         return sqlite3.connect(DB_FILE)
 
@@ -58,7 +98,8 @@ def get_cursor(conn):
     Returns:
         Cursor object with appropriate row factory
     """
-    if DATABASE_TYPE == "postgresql":
+    db_type, _ = get_database_config()
+    if db_type == "postgresql":
         return conn.cursor(cursor_factory=RealDictCursor)
     else:
         conn.row_factory = sqlite3.Row
@@ -76,7 +117,8 @@ def adapt_placeholder(query: str) -> str:
     Returns:
         Query string with appropriate placeholders
     """
-    if DATABASE_TYPE == "postgresql":
+    db_type, _ = get_database_config()
+    if db_type == "postgresql":
         return query.replace("?", "%s")
     return query
 

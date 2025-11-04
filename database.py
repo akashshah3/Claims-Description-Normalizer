@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
+from functools import lru_cache
 
 # Load environment variables
 load_dotenv()
@@ -54,16 +55,36 @@ if DATABASE_TYPE == "postgresql":
     try:
         import psycopg2
         from psycopg2.extras import RealDictCursor
+        from psycopg2 import pool
     except ImportError:
         raise ImportError(
             "psycopg2 is required for PostgreSQL support. "
             "Install it with: pip install psycopg2-binary"
         )
 
+# Connection pool for PostgreSQL (reuse connections)
+_connection_pool = None
+
+def init_connection_pool():
+    """Initialize PostgreSQL connection pool for better performance"""
+    global _connection_pool
+    if _connection_pool is None:
+        db_type, db_url = get_database_config()
+        if db_type == "postgresql" and db_url:
+            try:
+                _connection_pool = pool.SimpleConnectionPool(
+                    minconn=1,
+                    maxconn=5,
+                    dsn=db_url
+                )
+            except Exception as e:
+                print(f"Warning: Could not initialize connection pool: {e}")
+                _connection_pool = None
 
 def get_connection():
     """
     Get database connection based on DATABASE_TYPE
+    Uses connection pooling for PostgreSQL to improve performance
     
     Returns:
         Database connection object
@@ -78,15 +99,62 @@ def get_connection():
                 "Please set DATABASE_URL in your .env file or Streamlit Cloud secrets."
             )
         try:
-            return psycopg2.connect(db_url)
+            # Initialize pool if needed
+            global _connection_pool
+            if _connection_pool is None:
+                init_connection_pool()
+            
+            # Try to get connection from pool
+            if _connection_pool is not None:
+                try:
+                    return _connection_pool.getconn()
+                except:
+                    pass  # Fall back to direct connection
+            
+            # Fallback: direct connection with timeout
+            return psycopg2.connect(
+                db_url,
+                connect_timeout=10,
+                options='-c statement_timeout=5000'  # 5 second query timeout
+            )
         except Exception as e:
             raise ConnectionError(
                 f"Failed to connect to PostgreSQL database: {str(e)}. "
                 "Please check your DATABASE_URL configuration."
             )
     else:
-        return sqlite3.connect(DB_FILE)
+        # SQLite connection with timeout
+        conn = sqlite3.connect(DB_FILE, timeout=10.0)
+        return conn
 
+
+def close_connection(conn):
+    """
+    Properly close or return connection to pool
+    
+    Args:
+        conn: Database connection to close
+    """
+    db_type, _ = get_database_config()
+    
+    if db_type == "postgresql":
+        global _connection_pool
+        if _connection_pool is not None:
+            try:
+                _connection_pool.putconn(conn)
+                return
+            except:
+                pass  # Fall through to regular close
+        
+        try:
+            close_connection(conn)
+        except:
+            pass
+    else:
+        try:
+            close_connection(conn)
+        except:
+            pass
 
 def get_cursor(conn):
     """
@@ -191,8 +259,44 @@ def init_database():
             )
         """)
     
+    # Create indexes for frequently queried columns
+    if DATABASE_TYPE == "postgresql":
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_history_timestamp 
+            ON claim_history(timestamp DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_history_loss_type 
+            ON claim_history(loss_type)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_history_severity 
+            ON claim_history(severity)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_recommendations_claim_id 
+            ON claim_recommendations(claim_id)
+        """)
+    else:
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_history_timestamp 
+            ON claim_history(timestamp DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_history_loss_type 
+            ON claim_history(loss_type)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_history_severity 
+            ON claim_history(severity)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_claim_recommendations_claim_id 
+            ON claim_recommendations(claim_id)
+        """)
+    
     conn.commit()
-    conn.close()
+    close_connection(conn)
 
 
 def save_claim_to_history(claim_text: str, extracted_data: Dict) -> int:
@@ -250,7 +354,7 @@ def save_claim_to_history(claim_text: str, extracted_data: Dict) -> int:
         record_id = cursor.lastrowid
     
     conn.commit()
-    conn.close()
+    close_connection(conn)
     
     return record_id
 
@@ -276,7 +380,7 @@ def get_all_history(limit: int = 100) -> List[Dict]:
     
     cursor.execute(query, (limit,))
     rows = cursor.fetchall()
-    conn.close()
+    close_connection(conn)
     
     # Convert to list of dictionaries
     history = [dict(row) for row in rows]
@@ -310,7 +414,7 @@ def get_history_by_id(record_id: int) -> Optional[Dict]:
     
     cursor.execute(query, (record_id,))
     row = cursor.fetchone()
-    conn.close()
+    close_connection(conn)
     
     if row:
         record = dict(row)
@@ -344,7 +448,7 @@ def delete_history_item(record_id: int) -> bool:
     rows_affected = cursor.rowcount
     
     conn.commit()
-    conn.close()
+    close_connection(conn)
     
     return rows_affected > 0
 
@@ -387,7 +491,7 @@ def search_history(
     
     cursor.execute(query, params)
     rows = cursor.fetchall()
-    conn.close()
+    close_connection(conn)
     
     history = [dict(row) for row in rows]
     
@@ -439,7 +543,7 @@ def get_history_stats() -> Dict:
         if isinstance(last_claim, datetime):
             last_claim = last_claim.strftime('%Y-%m-%d %H:%M:%S')
     
-    conn.close()
+    close_connection(conn)
     
     return {
         "total_claims": total_count,
@@ -462,7 +566,7 @@ def clear_all_history() -> int:
     rows_affected = cursor.rowcount
     
     conn.commit()
-    conn.close()
+    close_connection(conn)
     
     return rows_affected
 
@@ -591,7 +695,7 @@ def get_analytics_data() -> Dict:
     """)
     severity_by_loss_type = [dict(row) for row in cursor.fetchall()]
     
-    conn.close()
+    close_connection(conn)
     
     # Extract estimated loss values
     if DATABASE_TYPE == "postgresql":
@@ -673,7 +777,7 @@ def save_recommendations_to_history(claim_id: int, recommendations: List[Dict]) 
         rows_inserted += 1
     
     conn.commit()
-    conn.close()
+    close_connection(conn)
     
     return rows_inserted
 
@@ -708,7 +812,7 @@ def get_recommendations_by_claim_id(claim_id: int) -> List[Dict]:
     
     cursor.execute(query, (claim_id,))
     rows = cursor.fetchall()
-    conn.close()
+    close_connection(conn)
     
     recommendations = [dict(row) for row in rows]
     return recommendations
@@ -735,7 +839,7 @@ def has_recommendations(claim_id: int) -> bool:
     cursor.execute(query, (claim_id,))
     result = cursor.fetchone()
     count = result[0] if result else 0
-    conn.close()
+    close_connection(conn)
     
     return count > 0
 
@@ -762,7 +866,7 @@ def delete_recommendations_by_claim_id(claim_id: int) -> int:
     rows_deleted = cursor.rowcount
     
     conn.commit()
-    conn.close()
+    close_connection(conn)
     
     return rows_deleted
 

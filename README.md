@@ -396,11 +396,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📞 Contact
+## � Authors
 
 **Akash Shah**
 - GitHub: [@akashshah3](https://github.com/akashshah3)
-- Project Link: [Claims-Description-Normalizer](https://github.com/akashshah3/Claims-Description-Normalizer)
+
+**Laxmi Khilnani**
+- GitHub: [@laxmikhilnani20](https://github.com/laxmikhilnani20)
+
+**Project Link**: [Claims-Description-Normalizer](https://github.com/akashshah3/Claims-Description-Normalizer)
 - Deployment Link: [Access App](https://ai-claims-description-normalizer.streamlit.app/)
 ---
 

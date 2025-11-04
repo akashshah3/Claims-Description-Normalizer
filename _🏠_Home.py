@@ -591,7 +591,10 @@ def main():
         st.info("""
             📜 **History** - View all processed claims
             
+            📈 **Analytics** - Interactive visualizations showing trends and insights
+
             ℹ️ **About** - Learn more about this tool
+                
         """)
         
         st.markdown("---")

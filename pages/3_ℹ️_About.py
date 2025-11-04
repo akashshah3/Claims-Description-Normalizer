@@ -260,10 +260,12 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("""
-    ### 👨‍💻 Developer
-    **Akash Shah**
-    
+    ### � Developers
+    **Akash Shah**  
     [GitHub Profile](https://github.com/akashshah3)
+    
+    **Laxmi Khilnani**  
+    [GitHub Profile](https://github.com/laxmikhilnani20)
     """)
 
 with col2:

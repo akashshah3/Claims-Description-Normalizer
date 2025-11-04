@@ -4,13 +4,13 @@ An AI-powered tool that transforms unstructured insurance claim descriptions int
 ### Planned
 
 - [ ] Add PostgreSQL Database(Supabase) support  
-- [ ] Add Pagination in History page  
-- [ ] Nav Bar Title fix  
 
 ### Working
 
 
 ### Completed
 
+- [ ] Nav Bar Title fix  
+- [ ] Add Pagination in History page  
 - [ ] Better UI for Recommendation button in History Page  
 

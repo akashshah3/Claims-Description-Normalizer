@@ -80,7 +80,7 @@ Claims_Description_Normalizer/
 ### Prerequisites
 
 - Python 3.8 or higher
-- Google Gemini API key ([Get one here](https://makersuite.google.com/app/apikey))
+- Google Gemini API key from Google AI Studio ([Get one here](https://aistudio.google.com/))
 
 ### Installation
 
@@ -401,7 +401,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Akash Shah**
 - GitHub: [@akashshah3](https://github.com/akashshah3)
 - Project Link: [Claims-Description-Normalizer](https://github.com/akashshah3/Claims-Description-Normalizer)
-
+- Deployment Link: [Access App](https://ai-claims-description-normalizer.streamlit.app/)
 ---
 
 <div align="center">

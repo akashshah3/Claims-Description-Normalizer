@@ -1,0 +1,11 @@
+{
+  "date_of_loss": {
+    "extraction_rate": 36.896551724137936
+  },
+  "location": {
+    "extraction_rate": 29.310344827586203
+  },
+  "affected_item": {
+    "extraction_rate": 100.0
+  }
+}

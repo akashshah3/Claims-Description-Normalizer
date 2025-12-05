@@ -1,0 +1,44 @@
+{
+  "model_type": "TF-IDF + Logistic Regression + Rule-based Extraction",
+  "classification_models": [
+    "category",
+    "severity",
+    "sentiment",
+    "incident_type"
+  ],
+  "extraction_methods": [
+    "regex + dateutil (date)",
+    "regex + patterns (location)",
+    "keyword extraction (affected_item)"
+  ],
+  "performance": {
+    "classification": {
+      "average_accuracy": 82.93103448275862,
+      "per_field": {
+        "category": 97.58620689655172,
+        "severity": 78.27586206896552,
+        "sentiment": 91.37931034482759,
+        "incident_type": 64.48275862068965
+      }
+    },
+    "extraction": {
+      "date_of_loss": {
+        "extraction_rate": 36.896551724137936
+      },
+      "location": {
+        "extraction_rate": 29.310344827586203
+      },
+      "affected_item": {
+        "extraction_rate": 100.0
+      }
+    }
+  },
+  "files_for_deployment": [
+    "baseline_tfidf_vectorizer.pkl",
+    "baseline_model_category.pkl",
+    "baseline_model_severity.pkl",
+    "baseline_model_sentiment.pkl",
+    "baseline_model_incident_type.pkl",
+    "extraction_functions.py"
+  ]
+}
